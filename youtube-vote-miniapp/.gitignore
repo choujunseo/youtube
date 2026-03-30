@@ -2,6 +2,7 @@
 node_modules/
 
 # Build outputs
+*.ait
 dist/
 dist-ssr/
 coverage/

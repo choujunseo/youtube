@@ -44,6 +44,9 @@ lerna-debug.log*
 # Granite / AppsInToss local metadata
 **/.granite/
 
+# AppsInToss app bundle (build artifact from `granite build` / npm build)
+**/*.ait
+
 # mTLS certificates and private keys
 **/certs/*.key
 **/certs/*.crt
