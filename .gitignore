@@ -1,0 +1,55 @@
+# OS / system files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE temp files
+.idea/
+.cursor/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Dependencies (workspace-wide)
+**/node_modules/
+
+# Build outputs (workspace-wide)
+**/dist/
+**/dist-ssr/
+**/coverage/
+**/.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local-only files
+*.local
+**/*.local
+
+# Environment variables (keep sample files tracked)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Granite / AppsInToss local metadata
+**/.granite/
+
+# mTLS certificates and private keys
+**/certs/*.key
+**/certs/*.crt
+**/certs/*.pem
+**/certs/*.p12
+**/certs/*.pfx
+
+# Supabase local artifacts
+**/supabase/.temp/
