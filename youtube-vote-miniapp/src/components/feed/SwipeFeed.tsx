@@ -4,12 +4,10 @@ import { Skeleton } from '@toss/tds-mobile';
 import QueryErrorPanel from '@/components/common/QueryErrorPanel';
 import { useInfiniteScrollTrigger } from '@/hooks/feed/useInfiniteScrollTrigger';
 import { useFeedStyleIdeaActions } from '@/hooks/feed/useFeedStyleIdeaActions';
-import { useFeverMode } from '@/hooks/useFeverMode';
 import { FEED_EXPOSURE } from '@/lib/feedExposureConfig';
 import {
-  useActiveWeekQuery,
   useIdeasInfiniteQuery,
-  useMyVotesForWeekQuery,
+  useMyVotesAllQuery,
 } from '@/hooks/queries';
 import { getGuestFeedUserId } from '@/lib/guestFeedSession';
 import { recordIdeaImpressions } from '@/services/ideaService';
@@ -33,7 +31,7 @@ function isBoostActive(idea: IIdea, nowMs: number): boolean {
   return new Date(idea.boostExpiresAt).getTime() > nowMs;
 }
 
-function reorderByBoostExposure(ideas: IIdea[], weekId: string, feverMode: boolean): IIdea[] {
+function reorderByBoostExposure(ideas: IIdea[], seedKey: string, feverMode: boolean): IIdea[] {
   const nowMs = Date.now();
   const boostWeight = feverMode ? FEED_EXPOSURE.boostWeightFever : FEED_EXPOSURE.boostWeightDefault;
 
@@ -41,7 +39,7 @@ function reorderByBoostExposure(ideas: IIdea[], weekId: string, feverMode: boole
     const createdMs = new Date(idea.createdAt).getTime();
     const recencyHours = Math.max(1, (nowMs - createdMs) / 3_600_000);
     const recencyScore = 1 / recencyHours;
-    const jitterSeed = hashString(`${idea.id}:${weekId}`);
+    const jitterSeed = hashString(`${idea.id}:${seedKey}`);
     const jitter = FEED_EXPOSURE.jitterMin + (jitterSeed % 1000) / 1000 * FEED_EXPOSURE.jitterRange;
     const weight = isBoostActive(idea, nowMs) ? boostWeight : 1;
 
@@ -95,17 +93,8 @@ export default function SwipeFeed() {
   const pendingIdeaIdsRef = useRef<Set<string>>(new Set());
   const flushTimerRef = useRef<number | null>(null);
 
-  const {
-    data: activeWeek,
-    isLoading: isWeekLoading,
-    error: weekError,
-    refetch: refetchWeek,
-  } = useActiveWeekQuery();
-  const weekId = activeWeek?.id ?? null;
-  const feverMode = useFeverMode(activeWeek?.status);
-
-  const ideasQuery = useIdeasInfiniteQuery(weekId, feedUserId, 10, { feverMode });
-  const votesQuery = useMyVotesForWeekQuery(weekId);
+  const ideasQuery = useIdeasInfiniteQuery(feedUserId, 10);
+  const votesQuery = useMyVotesAllQuery();
   const {
     onVote,
     onReport,
@@ -121,8 +110,8 @@ export default function SwipeFeed() {
     [ideasQuery.data],
   );
   const exposedIdeas = useMemo(
-    () => reorderByBoostExposure(ideas, weekId ?? 'no-week', feverMode),
-    [ideas, weekId, feverMode],
+    () => reorderByBoostExposure(ideas, feedUserId, false),
+    [ideas, feedUserId],
   );
   const myVoteMap = useMemo(
     () =>
@@ -136,7 +125,7 @@ export default function SwipeFeed() {
   useEffect(() => {
     observedIdeaIdsRef.current.clear();
     pendingIdeaIdsRef.current.clear();
-  }, [weekId, userId]);
+  }, [userId]);
 
   const setCardRef = useCallback((ideaId: string, element: HTMLDivElement | null) => {
     if (element) {
@@ -147,7 +136,7 @@ export default function SwipeFeed() {
   }, []);
 
   useEffect(() => {
-    if (!userId || !weekId || exposedIdeas.length === 0) return;
+    if (!userId || exposedIdeas.length === 0) return;
 
     const scheduleFlush = () => {
       if (flushTimerRef.current != null) return;
@@ -158,7 +147,6 @@ export default function SwipeFeed() {
         pendingIdeaIdsRef.current.clear();
         void recordIdeaImpressions({
           userId,
-          weekId,
           ideaIds: ids,
           action: 'view',
         });
@@ -203,13 +191,12 @@ export default function SwipeFeed() {
         pendingIdeaIdsRef.current.clear();
         void recordIdeaImpressions({
           userId,
-          weekId,
           ideaIds: ids,
           action: 'view',
         });
       }
     };
-  }, [exposedIdeas, userId, weekId]);
+  }, [exposedIdeas, userId]);
 
   const sentinelRef = useInfiniteScrollTrigger({
     enabled: Boolean(ideasQuery.hasNextPage && !ideasQuery.isFetchingNextPage),
@@ -228,7 +215,7 @@ export default function SwipeFeed() {
     } finally {
       setIsPullRefreshing(false);
     }
-  }, [ideasQuery, isPullRefreshing, refetchWeek, votesQuery]);
+  }, [ideasQuery, isPullRefreshing, votesQuery]);
 
   const onTouchStart = (event: TouchEvent<HTMLElement>) => {
     if (isPullRefreshing) return;
@@ -279,45 +266,6 @@ export default function SwipeFeed() {
       isSubmitting={isReportSubmitting}
     />
   );
-
-  if (isWeekLoading) {
-    return (
-      <>
-        <section className="space-y-3 px-4 pb-6">
-          <Skeleton className="w-full max-w-md" pattern="cardOnly" repeatLastItemCount={3} />
-        </section>
-        {reportModalEl}
-      </>
-    );
-  }
-
-  if (weekError) {
-    return (
-      <>
-        <section className="px-4 pb-6">
-          <QueryErrorPanel
-            title="주차 정보를 불러오지 못했어요"
-            message="네트워크 상태를 확인한 뒤 다시 시도해 주세요."
-            onRetry={() => void refetchWeek()}
-          />
-        </section>
-        {reportModalEl}
-      </>
-    );
-  }
-
-  if (!activeWeek) {
-    return (
-      <>
-        <section className="px-4 pb-6">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-            현재 진행 중인 주차가 없어요.
-          </div>
-        </section>
-        {reportModalEl}
-      </>
-    );
-  }
 
   if (ideasQuery.isError) {
     return (
@@ -382,7 +330,10 @@ export default function SwipeFeed() {
 
       {!ideasQuery.isLoading && exposedIdeas.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-          이번 주 등록된 아이디어가 없어요.
+          <p className="font-medium text-gray-700">지금은 보여 줄 아이디어가 없어요</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+            올라온 글이 없거나, 이미 본 아이디어는 피드에 다시 나오지 않아요. 잠시 뒤 새로고침하거나 새 업로드를 기다려 주세요.
+          </p>
         </div>
       ) : null}
 

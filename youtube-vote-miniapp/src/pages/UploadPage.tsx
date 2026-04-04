@@ -2,7 +2,7 @@ import { Button, Paragraph, useToast } from '@toss/tds-mobile';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BrandPageHeader from '@/components/common/BrandPageHeader';
-import { useActiveWeekQuery, useInsertIdeaMutation, useMyIdeasForWeekQuery } from '@/hooks/queries';
+import { useInsertIdeaMutation, useMyDailyIdeaUploadCountQuery } from '@/hooks/queries';
 import { useRewardedAd } from '@/hooks/useRewardedAd';
 import { uploadSubmitAdGroupId } from '@/lib/adGroupIds';
 import {
@@ -16,7 +16,7 @@ import {
   textContainsProfanity,
 } from '@/lib/profanityCheck';
 import {
-  MAX_WEEKLY_IDEA_UPLOADS,
+  MAX_DAILY_IDEA_UPLOADS,
   UPLOAD_DESC_MAX,
   UPLOAD_TAG_MAX_COUNT,
   UPLOAD_TAG_MAX_LEN,
@@ -24,6 +24,14 @@ import {
 } from '@/lib/uploadLimits';
 import { patchUserAfterIdeaUpload } from '@/services/userService';
 import { useAuthStore } from '@/store/authStore';
+
+function getKstTodayKey(now = new Date()): string {
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(kst.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 function normalizeTagInput(raw: string): string {
   return raw.trim().replace(/\s+/g, ' ');
@@ -44,19 +52,17 @@ export default function UploadPage() {
   const [hydrationToken, setHydrationToken] = useState(0);
 
   const hydratedKeyRef = useRef<string>('');
+  const draftScopeKey = useMemo(() => `kst-day:${getKstTodayKey()}`, []);
 
-  const { data: activeWeek, isLoading: weekLoading, error: weekError } = useActiveWeekQuery();
-  const weekId = activeWeek?.id ?? null;
-
-  const myIdeasQuery = useMyIdeasForWeekQuery(userId, weekId);
-  const myCount = (myIdeasQuery.data ?? []).length;
+  const myDailyCountQuery = useMyDailyIdeaUploadCountQuery(userId);
+  const myCount = myDailyCountQuery.data ?? 0;
 
   const insertMutation = useInsertIdeaMutation();
   const submitAdGroupId = useMemo(() => uploadSubmitAdGroupId(), []);
   const { isSupported: adSupported, isLoaded: adLoaded, showRewarded } = useRewardedAd(submitAdGroupId);
   const [uploadFlowBusy, setUploadFlowBusy] = useState(false);
 
-  const atUploadCap = myCount >= MAX_WEEKLY_IDEA_UPLOADS;
+  const atUploadCap = myCount >= MAX_DAILY_IDEA_UPLOADS;
   const canFillForm = !atUploadCap;
 
   const profanityNoticeSlot = useMemo(() => {
@@ -72,11 +78,11 @@ export default function UploadPage() {
   const hasProfanityInUploadForm = profanityNoticeSlot != null;
 
   useEffect(() => {
-    if (weekLoading || !weekId || !userId) return;
-    const k = `${userId}:${weekId}`;
+    if (!userId) return;
+    const k = `${userId}:${draftScopeKey}`;
     if (hydratedKeyRef.current === k) return;
     hydratedKeyRef.current = k;
-    const draft = readUploadDraft(userId, weekId);
+    const draft = readUploadDraft(userId, draftScopeKey);
     if (draft) {
       setTitle(draft.title);
       setDescription(draft.description);
@@ -89,15 +95,20 @@ export default function UploadPage() {
       setTagDraft('');
     }
     setHydrationToken((n) => n + 1);
-  }, [weekLoading, weekId, userId]);
+  }, [draftScopeKey, userId]);
 
   useEffect(() => {
-    if (hydrationToken === 0 || weekLoading || !weekId || !userId) return;
+    if (hydrationToken === 0 || !userId) return;
     const t = window.setTimeout(() => {
-      writeUploadDraft(userId, weekId, { title, description, tags, tagDraft });
+      writeUploadDraft(userId, draftScopeKey, {
+        title,
+        description,
+        tags,
+        tagDraft,
+      });
     }, 400);
     return () => window.clearTimeout(t);
-  }, [title, description, tags, tagDraft, weekId, userId, weekLoading, hydrationToken]);
+  }, [title, description, tags, tagDraft, draftScopeKey, userId, hydrationToken]);
 
   const addTag = useCallback(() => {
     const v = normalizeTagInput(tagDraft);
@@ -130,8 +141,8 @@ export default function UploadPage() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!userId || !weekId) {
-      openToast('로그인 또는 주차 정보를 확인할 수 없어요.', { higherThanCTA: true, duration: 2600 });
+    if (!userId) {
+      openToast('로그인 정보를 확인할 수 없어요.', { higherThanCTA: true, duration: 2600 });
       return;
     }
 
@@ -142,6 +153,14 @@ export default function UploadPage() {
 
     const t = title.trim();
     const d = description.trim();
+    const creatorNickname = user?.displayName?.trim() ?? '';
+    if (!creatorNickname) {
+      openToast('닉네임 설정 후 업로드할 수 있어요. 다시 로그인해 주세요.', {
+        higherThanCTA: true,
+        duration: 2800,
+      });
+      return;
+    }
     if (t.length === 0 || t.length > UPLOAD_TITLE_MAX) {
       openToast(`제목은 1~${UPLOAD_TITLE_MAX}자로 입력해 주세요.`, { higherThanCTA: true, duration: 2600 });
       return;
@@ -184,7 +203,6 @@ export default function UploadPage() {
 
       await insertMutation.mutateAsync({
         creatorId: userId,
-        weekId,
         title: t,
         description: d,
         categoryTags: tags,
@@ -198,7 +216,7 @@ export default function UploadPage() {
       setDescription('');
       setTags([]);
       setTagDraft('');
-      clearUploadDraft(userId, weekId);
+      clearUploadDraft(userId, draftScopeKey);
       navigate('/my/ideas');
     } catch (err) {
       const msg = err instanceof Error ? err.message : '등록에 실패했어요.';
@@ -208,7 +226,7 @@ export default function UploadPage() {
     }
   };
 
-  if (weekLoading) {
+  if (myDailyCountQuery.isLoading) {
     return (
       <main className="flex min-h-[calc(100svh-64px)] flex-col bg-gray-50 p-4">
         <div className="mx-auto w-full max-w-md space-y-3">
@@ -219,10 +237,10 @@ export default function UploadPage() {
     );
   }
 
-  if (weekError || !activeWeek) {
+  if (myDailyCountQuery.isError) {
     return (
       <main className="flex min-h-[calc(100svh-64px)] flex-col bg-gray-50 p-4">
-        <p className="text-center text-sm text-gray-500">진행 중인 주차가 없어 업로드할 수 없어요.</p>
+        <p className="text-center text-sm text-gray-500">오늘 업로드 횟수를 불러오지 못했어요.</p>
       </main>
     );
   }
@@ -231,7 +249,7 @@ export default function UploadPage() {
     <main className="flex min-h-[calc(100svh-64px)] flex-col bg-gray-50">
       <BrandPageHeader
         title="아이디어 업로드"
-        subtitle={`이번 주 ${myCount} / ${MAX_WEEKLY_IDEA_UPLOADS} · 업로드마다 리워드 광고 시청 후 등록돼요`}
+        subtitle={`오늘 ${myCount}/2회 작성 완료`}
       />
 
       <section className="space-y-4 px-4 pb-8 pt-4">

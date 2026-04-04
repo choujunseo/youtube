@@ -53,3 +53,6 @@ certs/*.pfx
 
 # Supabase local artifacts
 supabase/.temp/
+supabase/.branches/
+supabase/.edge-secrets.local.env
+supabase/.edge-secrets.source.env

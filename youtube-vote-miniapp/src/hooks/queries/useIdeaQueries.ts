@@ -4,10 +4,9 @@ import { queryKeys } from '@/lib/queryKeys';
 import type { IInsertIdeaInput } from '@/services/ideaService';
 import {
   fetchIdeaById,
+  fetchMyDailyIdeaUploadCount,
   fetchMyIdeasAll,
   fetchIdeasPage,
-  fetchMyIdeasForWeek,
-  fetchWeekIdeasAll,
   insertIdea,
 } from '@/services/ideaService';
 
@@ -19,7 +18,6 @@ interface IUseIdeasInfiniteOptions {
 }
 
 export function useIdeasInfiniteQuery(
-  weekId: string | null,
   userId: string | null,
   pageSize = DEFAULT_PAGE_SIZE,
   options?: IUseIdeasInfiniteOptions,
@@ -27,18 +25,17 @@ export function useIdeasInfiniteQuery(
   const feverMode = Boolean(options?.feverMode);
   return useInfiniteQuery({
     queryKey: queryKeys.ideas.infinite(
-      `${weekId ?? '__none__'}:${userId ?? '__none__'}:${feverMode ? 'f' : 'n'}`,
+      `${userId ?? '__none__'}:${feverMode ? 'f' : 'n'}`,
     ),
     queryFn: ({ pageParam }) =>
       fetchIdeasPage({
         userId: userId!,
-        weekId: weekId!,
         limit: pageSize,
         offset: pageParam as number,
       }),
     initialPageParam: 0,
     getNextPageParam: (last) => last.nextOffset ?? undefined,
-    enabled: Boolean(weekId && userId),
+    enabled: Boolean(userId),
     staleTime: feverMode ? 10_000 : QUERY_STALE.ideasFeed,
     refetchInterval: feverMode ? 10_000 : false,
   });
@@ -53,15 +50,6 @@ export function useIdeaQuery(ideaId: string | null) {
   });
 }
 
-export function useMyIdeasForWeekQuery(creatorId: string | null, weekId: string | null) {
-  return useQuery({
-    queryKey: queryKeys.ideas.myWeek(creatorId ?? '', weekId ?? ''),
-    queryFn: () => fetchMyIdeasForWeek(creatorId!, weekId!),
-    enabled: Boolean(creatorId && weekId),
-    staleTime: QUERY_STALE.ideasFeed,
-  });
-}
-
 export function useMyIdeasAllQuery(creatorId: string | null) {
   return useQuery({
     queryKey: queryKeys.ideas.myAll(creatorId ?? ''),
@@ -71,12 +59,13 @@ export function useMyIdeasAllQuery(creatorId: string | null) {
   });
 }
 
-export function useWeekIdeasAllQuery(weekId: string | null) {
+export function useMyDailyIdeaUploadCountQuery(creatorId: string | null) {
   return useQuery({
-    queryKey: queryKeys.ideas.weekAll(weekId ?? ''),
-    queryFn: () => fetchWeekIdeasAll(weekId!),
-    enabled: Boolean(weekId),
-    staleTime: QUERY_STALE.ideasFeed,
+    queryKey: queryKeys.ideas.myDailyCount(creatorId ?? ''),
+    queryFn: () => fetchMyDailyIdeaUploadCount(creatorId!),
+    enabled: Boolean(creatorId),
+    staleTime: 10_000,
+    refetchInterval: 10_000,
   });
 }
 

@@ -3,18 +3,24 @@ import { makeBoostExpiresAt } from '@/lib/boostConfig';
 import { mapIdeaRow } from '@/lib/supabaseMappers';
 import type { IIdea, IIdeaCategory, IIdeaPage } from '@/types/idea';
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function getKstTodayStartIso(now = new Date()): string {
+  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
+  kstNow.setUTCHours(0, 0, 0, 0);
+  return new Date(kstNow.getTime() - KST_OFFSET_MS).toISOString();
+}
+
 export interface IFetchIdeasPageParams {
   userId: string;
-  weekId: string;
   limit: number;
   offset: number;
 }
 
 export async function fetchIdeasPage(params: IFetchIdeasPageParams): Promise<IIdeaPage> {
-  const { userId, weekId, limit, offset } = params;
+  const { userId, limit, offset } = params;
   const { data, error } = await supabase.rpc('fetch_feed_ideas_page', {
     p_user_id: userId,
-    p_week_id: weekId,
     p_limit: limit,
     p_offset: offset,
   });
@@ -28,18 +34,6 @@ export async function fetchIdeasPage(params: IFetchIdeasPageParams): Promise<IId
   return { items, nextOffset };
 }
 
-export async function fetchMyIdeasForWeek(creatorId: string, weekId: string): Promise<IIdea[]> {
-  const { data, error } = await supabase
-    .from('ideas')
-    .select('*')
-    .eq('creator_id', creatorId)
-    .eq('week_id', weekId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map(mapIdeaRow);
-}
-
 export async function fetchMyIdeasAll(creatorId: string): Promise<IIdea[]> {
   const { data, error } = await supabase
     .from('ideas')
@@ -51,12 +45,16 @@ export async function fetchMyIdeasAll(creatorId: string): Promise<IIdea[]> {
   return ((data ?? []) as Record<string, unknown>[]).map(mapIdeaRow);
 }
 
-/** 주차 전체 아이디어(순위/확률 분모용). RLS: 공개 읽기 */
-export async function fetchWeekIdeasAll(weekId: string): Promise<IIdea[]> {
-  const { data, error } = await supabase.from('ideas').select('*').eq('week_id', weekId);
+export async function fetchMyDailyIdeaUploadCount(creatorId: string): Promise<number> {
+  const kstTodayStartIso = getKstTodayStartIso();
+  const { count, error } = await supabase
+    .from('ideas')
+    .select('id', { count: 'exact', head: true })
+    .eq('creator_id', creatorId)
+    .gte('created_at', kstTodayStartIso);
 
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map(mapIdeaRow);
+  return count ?? 0;
 }
 
 export async function fetchIdeaById(ideaId: string): Promise<IIdea | null> {
@@ -80,18 +78,16 @@ export async function fetchIdeasByIds(ideaIds: string[]): Promise<IIdea[]> {
 
 export interface IRecordIdeaImpressionsInput {
   userId: string;
-  weekId: string;
   ideaIds: string[];
   action?: 'view' | 'pass' | 'vote';
 }
 
 export async function recordIdeaImpressions(input: IRecordIdeaImpressionsInput): Promise<void> {
-  const { userId, weekId, ideaIds, action = 'view' } = input;
+  const { userId, ideaIds, action = 'view' } = input;
   if (ideaIds.length === 0) return;
 
   const rows = ideaIds.map((ideaId) => ({
     user_id: userId,
-    week_id: weekId,
     idea_id: ideaId,
     action,
   }));
@@ -106,13 +102,11 @@ export async function recordIdeaImpressions(input: IRecordIdeaImpressionsInput):
 
 export async function markIdeaImpressionAsVote(
   userId: string,
-  weekId: string,
   ideaId: string,
 ): Promise<void> {
   const { error } = await supabase.from('idea_impressions').upsert(
     {
       user_id: userId,
-      week_id: weekId,
       idea_id: ideaId,
       action: 'vote',
     },
@@ -127,13 +121,11 @@ export async function markIdeaImpressionAsVote(
 
 export async function markIdeaImpressionAsPass(
   userId: string,
-  weekId: string,
   ideaId: string,
 ): Promise<void> {
   const { error } = await supabase.from('idea_impressions').upsert(
     {
       user_id: userId,
-      week_id: weekId,
       idea_id: ideaId,
       action: 'pass',
     },
@@ -148,7 +140,6 @@ export async function markIdeaImpressionAsPass(
 
 export interface IInsertIdeaInput {
   creatorId: string;
-  weekId: string;
   title: string;
   description: string;
   thumbnailUrl?: string | null;
@@ -162,7 +153,6 @@ export async function insertIdea(input: IInsertIdeaInput): Promise<IIdea> {
     .from('ideas')
     .insert({
       creator_id: input.creatorId,
-      week_id: input.weekId,
       title: input.title,
       description: input.description,
       thumbnail_url: input.thumbnailUrl ?? null,

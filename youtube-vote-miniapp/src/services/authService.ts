@@ -1,5 +1,36 @@
+import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/services/supabase';
 import type { ITokenExchangeResponse } from '@/types/user';
+
+async function messageFromFunctionsInvokeError(err: unknown): Promise<string> {
+  if (err instanceof FunctionsFetchError) {
+    const c = err.context;
+    if (c instanceof Error) {
+      return `${err.message}: ${c.message}`;
+    }
+    if (c && typeof c === 'object' && 'message' in c) {
+      return `${err.message}: ${String((c as { message: unknown }).message)}`;
+    }
+    return err.message;
+  }
+  if (err instanceof FunctionsHttpError) {
+    const res = err.context as Response;
+    try {
+      const body = (await res.clone().json()) as {
+        error?: string;
+        errorCode?: string;
+      };
+      if (body?.error) {
+        return body.errorCode ? `${body.error} (${body.errorCode})` : body.error;
+      }
+    } catch {
+      /* 본문 없음 또는 JSON 아님 */
+    }
+    return `${err.message} (HTTP ${res.status})`;
+  }
+  if (err instanceof Error) return err.message;
+  return 'Token exchange failed';
+}
 
 /**
  * RLS(auth.uid)와 `public.users.auth_user_id`를 맞추기 위해,
@@ -38,8 +69,13 @@ export async function exchangeToken(
     },
   );
 
-  if (error || !data) {
-    throw new Error(error?.message ?? 'Token exchange failed');
+  if (error) {
+    throw new Error(await messageFromFunctionsInvokeError(error));
+  }
+
+  if (!data?.accessToken || data.tossUserKey == null) {
+    const maybe = data as { error?: string } | null;
+    throw new Error(maybe?.error ?? 'Token exchange failed');
   }
 
   return data;

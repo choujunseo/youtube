@@ -6,20 +6,8 @@ import {
   castVoteAtomic,
   fetchMyVoteForIdea,
   fetchMyVotedIdeasAll,
-  fetchMyVotedIdeasForWeek,
   fetchMyVotesAll,
-  fetchMyVotesForWeek,
 } from '@/services/voteService';
-
-export function useMyVotesForWeekQuery(weekId: string | null) {
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-  return useQuery({
-    queryKey: queryKeys.votes.myWeek(weekId ?? ''),
-    queryFn: () => fetchMyVotesForWeek(weekId!),
-    enabled: Boolean(weekId && isLoggedIn),
-    staleTime: QUERY_STALE.myVotes,
-  });
-}
 
 export function useMyVotesAllQuery() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -27,16 +15,6 @@ export function useMyVotesAllQuery() {
     queryKey: queryKeys.votes.myAll(),
     queryFn: () => fetchMyVotesAll(),
     enabled: Boolean(isLoggedIn),
-    staleTime: QUERY_STALE.myVotes,
-  });
-}
-
-export function useMyVotedIdeasForWeekQuery(weekId: string | null) {
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-  return useQuery({
-    queryKey: queryKeys.votes.myVotedIdeas(weekId ?? ''),
-    queryFn: () => fetchMyVotedIdeasForWeek(weekId!),
-    enabled: Boolean(weekId && isLoggedIn),
     staleTime: QUERY_STALE.myVotes,
   });
 }
@@ -51,12 +29,12 @@ export function useMyVotedIdeasAllQuery() {
   });
 }
 
-export function useMyVoteForIdeaQuery(ideaId: string | null, weekId: string | null) {
+export function useMyVoteForIdeaQuery(ideaId: string | null) {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   return useQuery({
-    queryKey: queryKeys.votes.myIdea(ideaId ?? '', weekId ?? ''),
-    queryFn: () => fetchMyVoteForIdea(ideaId!, weekId!),
-    enabled: Boolean(ideaId && weekId && isLoggedIn),
+    queryKey: queryKeys.votes.myIdea(ideaId ?? '', '__all__'),
+    queryFn: () => fetchMyVoteForIdea(ideaId!),
+    enabled: Boolean(ideaId && isLoggedIn),
     staleTime: QUERY_STALE.myVotes,
   });
 }

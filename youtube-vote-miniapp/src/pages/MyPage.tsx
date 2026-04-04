@@ -3,31 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import BrandPageHeader from '@/components/common/BrandPageHeader';
 import { List, ListRow, Paragraph, useToast } from '@toss/tds-mobile';
-import { useActiveWeekQuery, useLatestSettledWeekQuery, useMyIdeasForWeekQuery } from '@/hooks/queries';
+import { useMyIdeasAllQuery } from '@/hooks/queries';
 import { useRewardedAd } from '@/hooks/useRewardedAd';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTickets } from '@/hooks/useTickets';
 import { isBoostActive } from '@/lib/boostActive';
-import { formatWeekLabel } from '@/lib/weekLabel';
 import { insertAdLog, rewardShareViralTicket, rewardTicketRecharge } from '@/services/adLogService';
 import { activateIdeaBoost } from '@/services/ideaService';
 import { useAuthStore } from '@/store/authStore';
 import { openContactsViral } from '@/utils/tossBridge';
 
-const PREVIEW_MY_TABS = import.meta.env.VITE_MY_TABS_PREVIEW === 'true';
-
 export default function MyPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { openToast } = useToast();
-  const { data: latestSettled, isLoading: isSettledLoading } = useLatestSettledWeekQuery();
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const userId = user?.id ?? null;
   const tickets = useTickets();
-  const { data: activeWeek } = useActiveWeekQuery();
-  const weekId = activeWeek?.id ?? null;
-  const myIdeasQuery = useMyIdeasForWeekQuery(userId, weekId);
+  const myIdeasQuery = useMyIdeasAllQuery(userId);
 
   const activeBoostCount = useMemo(
     () => (myIdeasQuery.data ?? []).filter((idea) => isBoostActive(idea)).length,
@@ -49,15 +43,13 @@ export default function MyPage() {
   const boostAd = useRewardedAd(boostAdGroupId);
 
   type TMyRow =
-    | { key: string; title: string; kind: 'result' }
     | { key: string; title: string; kind: 'shareViral' }
     | { key: string; title: string; to: string };
 
   const rows: TMyRow[] = [
-    { key: 'settled', title: '지난 주 정산 결과', kind: 'result' },
     { key: 'voted', title: '내가 투표한 아이디어', to: '/my/votes' },
     { key: 'created', title: '내가 만든 아이디어', to: '/my/ideas' },
-    { key: 'adTicket', title: '광고 보고 티켓 얻기', to: '/my/reward-tickets' },
+    { key: 'adTicket', title: '광고 보고 투표권 얻기', to: '/my/reward-tickets' },
     { key: 'adBoost', title: '광고 보고 부스트 얻기', to: '/my/ideas' },
     { key: 'shareViral', title: '친구에게 공유하고 투표권 받기', kind: 'shareViral' },
     { key: 'guide', title: '아이디어리그 사용설명서', to: '/my/guide' },
@@ -97,7 +89,7 @@ export default function MyPage() {
   };
 
   const handleRewardBoostAd = async () => {
-    if (!userId || !weekId) return;
+    if (!userId) return;
     if (!boostAd.isSupported) {
       openToast('이 기기에서는 리워드 광고를 지원하지 않아요.', { higherThanCTA: true, duration: 2400 });
       return;
@@ -129,7 +121,6 @@ export default function MyPage() {
       });
       await Promise.all([
         myIdeasQuery.refetch(),
-        queryClient.invalidateQueries({ queryKey: queryKeys.ideas.weekAll(weekId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all }),
       ]);
       openToast('부스트가 적용됐어요.', { higherThanCTA: true, duration: 2200 });
@@ -211,6 +202,21 @@ export default function MyPage() {
       <BrandPageHeader title="My" />
 
       <section className="space-y-4 px-4 pb-6">
+        <p className="py-6 text-center text-[#191F28]">
+          {userId != null ? (
+            <>
+              <span className="text-[2.55rem] font-bold leading-none tracking-tight">
+                {(user?.displayName ?? '').trim() || '회원'}
+              </span>
+              <span className="ml-1 text-[1.4875rem] font-medium leading-none text-gray-500">님</span>
+            </>
+          ) : (
+            <>
+              <span className="text-[2.55rem] font-bold leading-none tracking-tight">게스트</span>
+              <span className="ml-1 text-[1.4875rem] font-medium leading-none text-gray-500">님</span>
+            </>
+          )}
+        </p>
         <div className="rounded-2xl border border-gray-100 bg-white px-6 py-10 shadow-sm">
           <div className="grid grid-cols-2 gap-6 text-center">
             <div className="flex flex-col items-center">
@@ -249,11 +255,7 @@ export default function MyPage() {
                 horizontalPadding="medium"
                 left={<span className="text-sm font-semibold text-gray-900">{row.title}</span>}
                 right={
-                  row.kind === 'result' && PREVIEW_MY_TABS ? (
-                    <span className="text-xs text-gray-500">25.03.24 - 25.03.30</span>
-                  ) : row.kind === 'result' && latestSettled ? (
-                    <span className="text-xs text-gray-500">{formatWeekLabel(latestSettled)}</span>
-                  ) : row.key === 'adTicket' && adBusy === 'adTicket' ? (
+                  row.key === 'adTicket' && adBusy === 'adTicket' ? (
                     <span className="text-xs text-gray-500">광고 재생 중</span>
                   ) : row.key === 'adBoost' && adBusy === 'adBoost' ? (
                     <span className="text-xs text-gray-500">광고 재생 중</span>
@@ -282,22 +284,6 @@ export default function MyPage() {
                   }
                   if (row.key === 'shareViral') {
                     void handleShareViral();
-                    return;
-                  }
-                  if (row.kind === 'result') {
-                    if (PREVIEW_MY_TABS) {
-                      navigate('/result/preview');
-                      return;
-                    }
-                    if (isSettledLoading) return;
-                    if (!latestSettled) {
-                      openToast('아직 공개된 정산 주차가 없어요.', {
-                        higherThanCTA: true,
-                        duration: 2400,
-                      });
-                      return;
-                    }
-                    navigate(`/result/${latestSettled.id}`);
                     return;
                   }
                   navigate(row.to);

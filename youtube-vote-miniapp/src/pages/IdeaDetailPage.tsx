@@ -53,7 +53,7 @@ export default function IdeaDetailPage() {
 
   const ideaQuery = useIdeaQuery(id ?? null);
   const idea = ideaQuery.data;
-  const voteQuery = useMyVoteForIdeaQuery(id ?? null, idea?.weekId ?? null);
+  const voteQuery = useMyVoteForIdeaQuery(id ?? null);
   const myVote = voteQuery.data;
   const vote = useVote();
 
@@ -82,8 +82,8 @@ export default function IdeaDetailPage() {
       if (res.success) {
         setIsVoteLocked(true);
         setGaugeCelebrateKey((k) => k + 1);
-        if (userId && idea?.weekId) {
-          await markIdeaImpressionAsVote(userId, idea.weekId, id);
+        if (userId) {
+          await markIdeaImpressionAsVote(userId, id);
         }
         const p =
           res.probability != null

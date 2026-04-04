@@ -1,15 +1,7 @@
--- 다음 진행 주 생성 템플릿 — 값만 바꾼 뒤 Supabase SQL Editor에서 실행
--- 전제: public.weeks 에 status IN ('active','fever') 인 행이 없을 것 (015 RPC 제약)
--- 문서: docs/weeks-operational-rules.md 섹션 8
+-- Deprecated: `public.weeks` 및 주차 기반 정산은 마이그레이션 027 이후 제거되었습니다.
+-- 운영 주차 생성 RPC(`admin_create_active_week`)는 더 이상 존재하지 않습니다.
+--
+-- 마일스톤(1,500표) 모델에서는 별도 "활성 주" 생성이 필요 없습니다.
+-- 로컬/스테이징 데이터가 필요하면 `scripts/seed-feed-test-ideas.sql` 를 사용하세요.
 
--- (선택) 진행 주 잔존 여부
--- SELECT id, year, week_number, status FROM public.weeks WHERE status IN ('active', 'fever');
-
-SELECT public.admin_create_active_week(
-  p_year := 2026,
-  p_week_number := 14,
-  p_start_at := '2026-04-06T00:00:00+09:00'::timestamptz,
-  p_end_at := '2026-04-12T23:59:59+09:00'::timestamptz,
-  p_fever_start_at := '2026-04-12T23:30:00+09:00'::timestamptz,
-  p_prize_pool := 1000000
-);
+SELECT 1 AS note;

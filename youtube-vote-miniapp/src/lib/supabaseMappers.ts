@@ -43,10 +43,12 @@ function mapIdeaCategoryCell(value: unknown): IIdea['category'] {
 }
 
 export function mapIdeaRow(row: Record<string, unknown>): IIdea {
+  const creatorDisplayName =
+    typeof row.creator_display_name === 'string' ? row.creator_display_name : '';
   return {
     id: row.id as string,
     creatorId: row.creator_id as string,
-    weekId: row.week_id as string,
+    creatorDisplayName,
     title: row.title as string,
     description: row.description as string,
     thumbnailUrl: (row.thumbnail_url as string | null) ?? null,
@@ -65,7 +67,6 @@ export function mapVoteRow(row: Record<string, unknown>): IVote {
     id: row.id as string,
     userId: row.user_id as string,
     ideaId: row.idea_id as string,
-    weekId: row.week_id as string,
     dayOfWeek: row.day_of_week as number,
     weight: row.weight as IVote['weight'],
     weightedShare: Number(row.weighted_share ?? 0),
@@ -76,7 +77,6 @@ export function mapVoteRow(row: Record<string, unknown>): IVote {
 export function mapLiveRankingRow(row: Record<string, unknown>): ILiveRankingRow {
   return {
     ideaId: row.idea_id as string,
-    weekId: row.week_id as string | undefined,
     title: row.title as string,
     description: typeof row.description === 'string' ? row.description : '',
     creatorId: row.creator_id as string,

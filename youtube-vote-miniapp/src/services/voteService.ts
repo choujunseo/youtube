@@ -31,17 +31,6 @@ export async function castVoteAtomic(userId: string, ideaId: string): Promise<IC
   };
 }
 
-export async function fetchMyVotesForWeek(weekId: string): Promise<IVote[]> {
-  const { data, error } = await supabase
-    .from('votes')
-    .select('*')
-    .eq('week_id', weekId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map(mapVoteRow);
-}
-
 export async function fetchMyVotesAll(): Promise<IVote[]> {
   const { data, error } = await supabase.from('votes').select('*').order('created_at', { ascending: false });
 
@@ -49,32 +38,16 @@ export async function fetchMyVotesAll(): Promise<IVote[]> {
   return ((data ?? []) as Record<string, unknown>[]).map(mapVoteRow);
 }
 
-export async function fetchMyVoteForIdea(ideaId: string, weekId: string): Promise<IVote | null> {
+export async function fetchMyVoteForIdea(ideaId: string): Promise<IVote | null> {
   const { data, error } = await supabase
     .from('votes')
     .select('*')
     .eq('idea_id', ideaId)
-    .eq('week_id', weekId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
   return mapVoteRow(data as Record<string, unknown>);
-}
-
-/** 이번 주 내 투표 목록 + 아이디어(삭제·RLS로 없으면 null) */
-export async function fetchMyVotedIdeasForWeek(weekId: string): Promise<IMyVotedIdeaRow[]> {
-  const votes = await fetchMyVotesForWeek(weekId);
-  const ids = [...new Set(votes.map((v) => v.ideaId))];
-  if (ids.length === 0) return [];
-
-  const ideas = await fetchIdeasByIds(ids);
-  const ideaMap = new Map(ideas.map((i) => [i.id, i]));
-
-  return votes.map((vote) => ({
-    vote,
-    idea: ideaMap.get(vote.ideaId) ?? null,
-  }));
 }
 
 export async function fetchMyVotedIdeasAll(): Promise<IMyVotedIdeaRow[]> {

@@ -5,7 +5,7 @@ export function rankingRowToIdea(row: ILiveRankingRow): IIdea {
   return {
     id: row.ideaId,
     creatorId: row.creatorId,
-    weekId: row.weekId ?? '',
+    creatorDisplayName: row.creatorName ?? '',
     title: row.title,
     description: row.description,
     thumbnailUrl: null,

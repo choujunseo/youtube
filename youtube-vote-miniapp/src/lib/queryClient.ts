@@ -8,6 +8,7 @@ export const QUERY_STALE = {
   myVotes: 20_000,
   liveRanking: 30_000,
   weeklyResult: 120_000,
+  notifications: 30_000,
 } as const;
 
 export const queryClient = new QueryClient({

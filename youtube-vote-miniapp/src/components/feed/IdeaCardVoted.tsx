@@ -16,7 +16,7 @@ interface IIdeaCardVotedProps {
 export default function IdeaCardVoted(props: IIdeaCardVotedProps) {
   const { idea, probability, onSeeDetail, tagRowPrefix, tagRowSuffix, hideDetailButton = false } = props;
 
-  const tagRow = (
+  const tagsBoost = (
     <>
       <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
         투표 완료
@@ -28,6 +28,19 @@ export default function IdeaCardVoted(props: IIdeaCardVotedProps) {
     </>
   );
 
+  const nickname = idea.creatorDisplayName.trim();
+  const topRowMain = (
+    <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+      <p
+        className="min-w-0 truncate text-xs font-medium text-gray-900"
+        title={nickname || undefined}
+      >
+        {nickname || '—'}
+      </p>
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{tagsBoost}</div>
+    </div>
+  );
+
   return (
     <article className="rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/40 to-white p-4 shadow-sm">
       <div className="mb-2 flex items-start gap-2">
@@ -35,13 +48,13 @@ export default function IdeaCardVoted(props: IIdeaCardVotedProps) {
           <>
             {tagRowPrefix}
             <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">{tagRow}</div>
+              {topRowMain}
               {tagRowSuffix ? <div className="shrink-0">{tagRowSuffix}</div> : null}
             </div>
           </>
         ) : (
           <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">{tagRow}</div>
+            {topRowMain}
             {tagRowSuffix ? <div className="shrink-0">{tagRowSuffix}</div> : null}
           </div>
         )}

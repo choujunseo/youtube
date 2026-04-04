@@ -10,7 +10,8 @@ interface TossDisconnectBody {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  /** 콘솔·토스 스펙: 연결 끊기 콜백은 GET(쿼리) 또는 POST(JSON) */
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -46,53 +47,16 @@ function isValidReferrer(value: unknown): value is TossDisconnectReferrer {
   return value === 'UNLINK' || value === 'WITHDRAWAL_TERMS' || value === 'WITHDRAWAL_TOSS';
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS });
-  }
+function parseUserKey(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const n = typeof raw === 'string' ? Number(raw) : typeof raw === 'number' ? raw : NaN;
+  return Number.isFinite(n) ? n : null;
+}
 
-  if (req.method !== 'POST') {
-    return Response.json(
-      { success: false, error: 'Method Not Allowed' },
-      { status: 405, headers: CORS_HEADERS },
-    );
-  }
-
-  if (!verifyBasicAuth(req.headers.get('Authorization'))) {
-    return Response.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS },
-    );
-  }
-
-  let body: TossDisconnectBody;
-  try {
-    body = (await req.json()) as TossDisconnectBody;
-  } catch {
-    return Response.json(
-      { success: false, error: 'Invalid JSON body' },
-      { status: 400, headers: CORS_HEADERS },
-    );
-  }
-
-  const userKeyRaw = body.userKey;
-  const referrerRaw = body.referrer;
-
-  const userKey = typeof userKeyRaw === 'string' ? Number(userKeyRaw) : userKeyRaw;
-  if (!Number.isFinite(userKey)) {
-    return Response.json(
-      { success: false, error: 'userKey is required' },
-      { status: 400, headers: CORS_HEADERS },
-    );
-  }
-
-  if (!isValidReferrer(referrerRaw)) {
-    return Response.json(
-      { success: false, error: 'referrer is invalid' },
-      { status: 400, headers: CORS_HEADERS },
-    );
-  }
-
+async function applyDisconnect(
+  userKey: number,
+  referrerRaw: TossDisconnectReferrer,
+): Promise<Response> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return Response.json(
       { success: false, error: 'Server env is not configured' },
@@ -123,4 +87,61 @@ Deno.serve(async (req: Request) => {
   }
 
   return Response.json({ success: true }, { status: 200, headers: CORS_HEADERS });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: CORS_HEADERS });
+  }
+
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return Response.json(
+      { success: false, error: 'Method Not Allowed' },
+      { status: 405, headers: CORS_HEADERS },
+    );
+  }
+
+  if (!verifyBasicAuth(req.headers.get('Authorization'))) {
+    return Response.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401, headers: CORS_HEADERS },
+    );
+  }
+
+  let userKey: number | null = null;
+  let referrerRaw: unknown;
+
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    userKey = parseUserKey(url.searchParams.get('userKey'));
+    referrerRaw = url.searchParams.get('referrer') ?? undefined;
+  } else {
+    let body: TossDisconnectBody;
+    try {
+      body = (await req.json()) as TossDisconnectBody;
+    } catch {
+      return Response.json(
+        { success: false, error: 'Invalid JSON body' },
+        { status: 400, headers: CORS_HEADERS },
+      );
+    }
+    userKey = parseUserKey(body.userKey);
+    referrerRaw = body.referrer;
+  }
+
+  if (userKey == null) {
+    return Response.json(
+      { success: false, error: 'userKey is required' },
+      { status: 400, headers: CORS_HEADERS },
+    );
+  }
+
+  if (!isValidReferrer(referrerRaw)) {
+    return Response.json(
+      { success: false, error: 'referrer is invalid' },
+      { status: 400, headers: CORS_HEADERS },
+    );
+  }
+
+  return applyDisconnect(userKey, referrerRaw);
 });

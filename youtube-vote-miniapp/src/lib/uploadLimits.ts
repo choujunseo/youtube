@@ -1,5 +1,5 @@
-/** 이번 주(활성 week)당 최대 아이디어 업로드 수 */
-export const MAX_WEEKLY_IDEA_UPLOADS = 7;
+/** 하루(KST)당 최대 아이디어 업로드 수 */
+export const MAX_DAILY_IDEA_UPLOADS = 2;
 
 /** 업로드 폼 필드 상한 (초안 캐시와 동일 값 유지) */
 export const UPLOAD_TITLE_MAX = 50;

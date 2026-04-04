@@ -17,20 +17,20 @@ export interface IUploadDraftSnapshot {
 
 interface IStoredPayload extends IUploadDraftSnapshot {
   v: typeof STORAGE_VERSION;
-  weekId: string;
+  scopeKey: string;
 }
 
-function key(userId: string, weekId: string): string {
-  return `${PREFIX}.v${STORAGE_VERSION}:${userId}:${weekId}`;
+function key(userId: string, scopeKey: string): string {
+  return `${PREFIX}.v${STORAGE_VERSION}:${userId}:${scopeKey}`;
 }
 
 function sanitizeDraft(
-  weekId: string,
+  scopeKey: string,
   raw: unknown,
 ): IUploadDraftSnapshot | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  if (o.v !== STORAGE_VERSION || typeof o.weekId !== 'string' || o.weekId !== weekId) {
+  if (o.v !== STORAGE_VERSION || typeof o.scopeKey !== 'string' || o.scopeKey !== scopeKey) {
     return null;
   }
   const title = typeof o.title === 'string' ? o.title.slice(0, UPLOAD_TITLE_MAX) : '';
@@ -49,12 +49,12 @@ function sanitizeDraft(
   return { title, description, tags, tagDraft };
 }
 
-/** 활성 주차·유저별 업로드 초안 읽기 (주차 불일치 시 무시) */
-export function readUploadDraft(userId: string, weekId: string): IUploadDraftSnapshot | null {
+/** scopeKey(예: KST 날짜)·유저별 업로드 초안 읽기 */
+export function readUploadDraft(userId: string, scopeKey: string): IUploadDraftSnapshot | null {
   try {
-    const raw = localStorage.getItem(key(userId, weekId));
+    const raw = localStorage.getItem(key(userId, scopeKey));
     if (!raw) return null;
-    return sanitizeDraft(weekId, JSON.parse(raw) as unknown);
+    return sanitizeDraft(scopeKey, JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
@@ -62,13 +62,13 @@ export function readUploadDraft(userId: string, weekId: string): IUploadDraftSna
 
 export function writeUploadDraft(
   userId: string,
-  weekId: string,
+  scopeKey: string,
   snapshot: IUploadDraftSnapshot,
 ): void {
   try {
     const payload: IStoredPayload = {
       v: STORAGE_VERSION,
-      weekId,
+      scopeKey,
       title: snapshot.title.slice(0, UPLOAD_TITLE_MAX),
       description: snapshot.description.slice(0, UPLOAD_DESC_MAX),
       tags: snapshot.tags
@@ -83,18 +83,18 @@ export function writeUploadDraft(
       payload.tags.length === 0 &&
       payload.tagDraft.trim() === '';
     if (empty) {
-      localStorage.removeItem(key(userId, weekId));
+      localStorage.removeItem(key(userId, scopeKey));
       return;
     }
-    localStorage.setItem(key(userId, weekId), JSON.stringify(payload));
+    localStorage.setItem(key(userId, scopeKey), JSON.stringify(payload));
   } catch {
     // 저장 공간 부족 등 — 무시
   }
 }
 
-export function clearUploadDraft(userId: string, weekId: string): void {
+export function clearUploadDraft(userId: string, scopeKey: string): void {
   try {
-    localStorage.removeItem(key(userId, weekId));
+    localStorage.removeItem(key(userId, scopeKey));
   } catch {
     // ignore
   }

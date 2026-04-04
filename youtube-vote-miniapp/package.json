@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "deploy": "ait deploy",
     "render:store-thumbnail": "node scripts/render-store-thumbnail.mjs",
-    "test:mtls": "node scripts/test-mtls.mjs"
+    "test:mtls": "node scripts/test-mtls.mjs",
+    "secrets:edge": "node scripts/write-edge-secrets-env.mjs && npx supabase secrets set --env-file supabase/.edge-secrets.local.env"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^2.1.0",
@@ -38,6 +39,7 @@
     "globals": "^17.4.0",
     "postcss": "^8.5.8",
     "puppeteer": "^24.40.0",
+    "supabase": "^2.84.5",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.57.0",

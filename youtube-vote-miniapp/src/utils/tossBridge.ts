@@ -11,8 +11,16 @@ const isMockMode = import.meta.env.DEV;
 const isContactsViralMock =
   import.meta.env.DEV || import.meta.env.VITE_IS_MOCK === 'true';
 
+/**
+ * 로그인만 `DEV === 목`으로 묶지 않음.
+ * `granite dev` + 토스 웹뷰에서도 `import.meta.env.DEV`가 true라, 목이면 가짜 authorizationCode로
+ * auth-token-exchange가 항상 실패하고 토스 로그인 시트도 뜨지 않음.
+ */
 export async function bridgeAppLogin() {
-  return isMockMode ? mockAppLogin() : appLogin();
+  const useMockLogin =
+    import.meta.env.VITE_IS_MOCK === 'true' ||
+    import.meta.env.VITE_USE_MOCK_APP_LOGIN === 'true';
+  return useMockLogin ? mockAppLogin() : appLogin();
 }
 
 export function getGoogleAdMob() {
@@ -130,6 +138,36 @@ export async function showIntegratedRewardAd(adGroupId: string): Promise<boolean
       });
 
       // 안전 장치: 환경 이슈로 dismissed가 누락되면 실패 처리
+      window.setTimeout(() => settle(false), 25_000);
+    });
+  } catch {
+    return false;
+  }
+}
+
+/** 전면형 광고(톨게이트): 보상 획득 여부와 무관하게 정상 노출/종료만 확인 */
+export async function showIntegratedFullScreenGateAd(adGroupId: string): Promise<boolean> {
+  try {
+    const { showFullScreenAd } = resolveIntegratedAdApi();
+    if (!isFn(showFullScreenAd)) return false;
+
+    return await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const settle = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      (showFullScreenAd as (params: IShowFullScreenAdParams) => unknown)({
+        options: { adGroupId },
+        onEvent: (event) => {
+          if (event.type === 'failedToShow') settle(false);
+          if (event.type === 'dismissed') settle(true);
+        },
+        onError: () => settle(false),
+      });
+
       window.setTimeout(() => settle(false), 25_000);
     });
   } catch {

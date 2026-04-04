@@ -4,7 +4,8 @@ export type IIdeaCategory = 'entertainment' | 'education' | 'vlog' | 'shorts' | 
 export interface IIdea {
   id: string;
   creatorId: string;
-  weekId: string;
+  /** 피드 RPC 등에서만 채워질 수 있음. 없으면 빈 문자열 */
+  creatorDisplayName: string;
   title: string;
   description: string;
   thumbnailUrl: string | null;

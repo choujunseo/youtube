@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { bridgeAppLogin } from '@/utils/tossBridge';
 import { exchangeToken } from '@/services/authService';
+import { claimAttendanceTicket } from '@/services/userService';
 import type { IUser } from '@/types/user';
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -24,6 +25,10 @@ function toIUser(row: Record<string, unknown>): IUser {
 
 type TLoginMode = 'auto' | 'interactive';
 
+export type TLoginResult =
+  | { ok: true }
+  | { ok: false; message: string; skipped?: boolean };
+
 export function useAuth() {
   const location = useLocation();
   const [authHydrated, setAuthHydrated] = useState(() => useAuthStore.persist.hasHydrated());
@@ -43,8 +48,10 @@ export function useAuth() {
   const hasTriedAutoRef = useRef(false);
 
   const login = useCallback(
-    async (mode: TLoginMode = 'auto'): Promise<boolean> => {
-      if (mode === 'auto' && hasTriedAutoRef.current) return false;
+    async (mode: TLoginMode = 'auto'): Promise<TLoginResult> => {
+      if (mode === 'auto' && hasTriedAutoRef.current) {
+        return { ok: false, message: '', skipped: true };
+      }
       if (mode === 'auto') hasTriedAutoRef.current = true;
 
       setError(null);
@@ -62,6 +69,15 @@ export function useAuth() {
         } = await exchangeToken(authorizationCode, referrer);
 
         const userData = toIUser(userRow);
+        try {
+          const attendance = await claimAttendanceTicket(userData.id);
+          if (attendance.success) {
+            userData.freeTickets = attendance.freeTickets;
+            userData.adTickets = attendance.adTickets;
+          }
+        } catch {
+          // 출석 지급 실패는 로그인 자체를 막지 않는다.
+        }
 
         setAuth({
           tossUserKey,
@@ -71,14 +87,14 @@ export function useAuth() {
           profileNameDecrypted,
         });
         setStatus('success');
-        return true;
+        return { ok: true };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Login failed';
         setError(message);
         setStatus('error');
         clearAuth();
         if (mode === 'auto') hasTriedAutoRef.current = false;
-        return false;
+        return { ok: false, message };
       }
     },
     [setAuth, clearAuth],
