@@ -1,0 +1,27 @@
+---
+description: Edge 배포, .env·edge-secrets example ↔ 로컬 파일 동기화
+alwaysApply: true
+---
+
+# Supabase Edge 배포 · 환경·시크릿 파일 동기화
+
+## `supabase/functions/**` (공유 `_shared` 포함)
+
+- 이 경로 아래를 **수정한 작업이 끝날 때** 반드시 Supabase CLI로 **배포까지 실행**한다. (코드만 바꾸고 끝내지 않는다.)
+- 배포 대상: `auth-token-exchange`, `toss-disconnect`, `toss-revoke-access`, `payout-worker` (각각 `npx supabase functions deploy <이름>`).
+- `_shared`만 바뀐 경우에도 이를 import하는 **위 함수 전부**를 다시 배포한다.
+- 프로젝트 ref가 필요하면 `supabase link` 상태를 쓰거나 `--project-ref <ref>`를 붙인다.
+
+## `.env.example` ↔ `.env`
+
+- **`.env.example`를 수정하면 같은 작업 안에서 `.env`도 example과 맞춘다.**
+  - 변수 **이름·순서·주석 블록**은 example을 기준으로 정렬한다.
+  - **비밀 값·로컬 전용 값**은 기존 `.env`에 있으면 유지하고, example의 `your-...` placeholder를 기계적으로 덮어쓰지 않는다.
+  - **새로 추가된 키**는 example과 동일한 기본값/placeholder로 `.env`에도 넣는다.
+
+## `supabase/.edge-secrets.source.env.example` ↔ `supabase/.edge-secrets.source.env`
+
+- **example을 수정하면** 같은 작업 안에서 **`.edge-secrets.source.env`도** example과 맞춘다.
+  - 변수 **이름·순서·주석 블록**은 example 기준.
+  - **이미 채워 둔 시크릿**(SUPABASE 키, 웹훅 비밀번호, `PAYOUT_WORKER_SECRET`, mTLS PEM 등)은 **유지**하고, example의 placeholder로 덮어쓰지 않는다.
+  - **새 키**는 example과 동일하게 추가(비어 있거나 주석 처리된 줄 그대로).

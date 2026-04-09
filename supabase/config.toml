@@ -1,0 +1,47 @@
+# Supabase local / link config — adjust project_id after `supabase link`
+# https://supabase.com/docs/guides/cli/config
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+# 호스트에 54322를 쓰는 Postgres가 있으면 충돌 → 여기만 바꾼 뒤 `supabase stop` 후 `supabase start`
+[db]
+port = 54332
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["https://127.0.0.1:5173"]
+enable_anonymous_sign_ins = true
+
+[auth.email]
+enable_signup = false
+
+# JWT 검증은 함수 내부에서 createClient(anon)+auth.getUser() 로 수행함.
+# verify_jwt=true 이면 게이트웨이가 먼저 검사해, 환경에 따라 "Invalid JWT"(401)만 보이고
+# 함수 로그/본문(Invalid Supabase session 등)에 도달하지 못하는 경우가 있음.
+[functions.auth-token-exchange]
+verify_jwt = false
+
+[functions.toss-disconnect]
+verify_jwt = false
+
+[functions.toss-revoke-access]
+verify_jwt = false
+
+[functions.payout-worker]
+verify_jwt = false
+
+[functions.withdraw-account]
+verify_jwt = false
+
+# Linked project ref is in .supabase/ (CLI). Use: supabase link --project-ref <ref>
